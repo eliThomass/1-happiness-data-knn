@@ -4,7 +4,7 @@
 # #### Independent Variables (Features): City Services, Housing Cost, Quality of Schools, Community Trust, Community Maintenance, Availability of Community Room.
 # #### Dependent Variable (Target Feature): Happiness.
 
-# In[2]:
+# In[5]:
 
 
 import csv
@@ -13,7 +13,7 @@ import sklearn
 
 # ## TASK 1 START: Load the dataset
 
-# In[3]:
+# In[6]:
 
 
 with open('HappinessData-1.csv', mode='r', newline='', encoding='utf-8') as dataset:
@@ -23,7 +23,7 @@ with open('HappinessData-1.csv', mode='r', newline='', encoding='utf-8') as data
 
 # ## TASK 2 START: Reorder dataset columns
 
-# In[4]:
+# In[7]:
 
 
 # The target feature (happy/unhappy) will be last column
@@ -42,7 +42,7 @@ print("New Order:", list(dataset_reordered[0].keys()))
 
 # ## TASK 3 START: Handle any missing/NA values
 
-# In[5]:
+# In[8]:
 
 
 print(f"Pre-clean rows: {len(dataset_reordered)}")
@@ -61,7 +61,7 @@ print(f"Post-clean rows: {len(clean_dataset)}")
 
 # ## TASK 4 START: Pearson Correlation
 
-# In[18]:
+# In[9]:
 
 
 import math
@@ -87,7 +87,7 @@ for i in range(len(X[0])):
 
 # ## TASK 5 START: Implement KNN without Scikit
 
-# In[19]:
+# In[10]:
 
 
 split_pos = int(len(clean_dataset) * 0.8)
@@ -119,7 +119,7 @@ print(f"Training set: {len(X_train)} rows")
 print(f"Testing set: {len(X_test)} rows")
 
 
-# In[20]:
+# In[11]:
 
 
 # Normalize features so they all fall between 0-1
@@ -142,7 +142,7 @@ X_train_norm = normalize_dataset(X_train, mins, maxs)
 X_test_norm = normalize_dataset(X_test, mins, maxs)
 
 
-# In[21]:
+# In[50]:
 
 
 # Function to find k nearest neighbors gets majority vote
@@ -163,7 +163,7 @@ def predict_classification(train_X, train_y, test_row, k, distance_func):
     return statistics.mode(neighbors_labels)
 
 
-# In[22]:
+# In[51]:
 
 
 # First distance metric we use is Euclidean
@@ -182,7 +182,7 @@ def manhattan(row1, row2):
     return distance
 
 
-# In[23]:
+# In[52]:
 
 
 k = 3
@@ -206,7 +206,7 @@ print(f"knn Accuracy (k={k}): {accuracy:.2%}")
 # Best k-value is 3 with accuracy of 75%
 
 
-# In[24]:
+# In[53]:
 
 
 k = 3
@@ -232,7 +232,7 @@ print(f"knn Accuracy (k={k}): {accuracy:.2%}")
 
 # ## TASK 6 START: Doing KNN using Scikit
 
-# In[25]:
+# In[16]:
 
 
 from sklearn.neighbors import KNeighborsClassifier
@@ -277,7 +277,7 @@ print(f"Scikit-Learn KNN Accuracy Euclidean (k={k_sklearn}): {sklearn_accuracy:.
 
 # ## TASK 7 START: Iterating over K values
 
-# In[26]:
+# In[17]:
 
 
 # These will hold the k-values we iterate over and their accuracy.
@@ -318,7 +318,7 @@ for i in range(0, 100):
 
 # ## TASK 8 START: Plot the error rate for both KNN algos
 
-# In[27]:
+# In[18]:
 
 
 # We need matplotlib to make a graph
@@ -358,7 +358,7 @@ plt.show()
 # 
 # ### Iterating over k-values again (also added another elbow graph just to compare between k-fold and 80/20).
 
-# In[28]:
+# In[19]:
 
 
 import random
@@ -463,7 +463,7 @@ plt.show()
 
 # ## TASK 10 START: Making a confusion matrix
 
-# In[29]:
+# In[20]:
 
 
 # The best k was 10 from previous testing
@@ -509,6 +509,186 @@ recall = TP / (TP + FN) if (TP + FN) > 0 else 0
 print(f"Precision: {precision:.2%}")
 print(f"Recall: {recall:.2%}")
 
+
+# # ABOVE AND BEYOND TASK: Implement Weighted KNN and Compare
+# - Using Euclidean Distance
+
+# In[36]:
+
+
+# Function to find k nearest neighbors gets majority vote, using weights
+def predict_classification_weighted(train_X, train_y, test_row, k, distance_func):
+    distances = []
+    # Calculate distance to every other row (datapoint)
+    for i in range(len(train_X)):
+        dist = distance_func(test_row, train_X[i])
+        distances.append((train_y[i], dist))
+
+    # Sort by distance
+    distances.sort(key=lambda x: x[1])
+
+    class_weights = {}
+
+    # Loop through only k neighbors
+    for i in range(k):
+        label = distances[i][0]
+        dist = distances[i][1]
+
+        # Calculate weight (added small number to prevent division by zero)
+        weight = 1.0 / ((dist**2) + 0.00001)
+
+        # Add the weight to the label's total
+        if label in class_weights:
+            class_weights[label] += weight
+        else:
+            class_weights[label] = weight
+
+    # Return the label that has the highest total weight (as opposed to the mode)
+    return max(class_weights, key=class_weights.get)
+
+
+# In[64]:
+
+
+k = 3
+predictions = []
+
+# EUCLIDEAN TEST
+for row in X_test_norm:
+    result = predict_classification_weighted(X_train_norm, y_train, row, k, euclidean)
+    predictions.append(result)
+
+# Calculate accuracy
+correct = 0
+for i in range(len(y_test)):
+    if y_test[i] == predictions[i]:
+        correct += 1
+
+accuracy = (correct / len(y_test))
+print(f"knn Accuracy (k={k}): {accuracy:.2%}")
+
+
+# ### Now that we have the function for weighted KNN, we will use N-Fold Cross Validation to compare weighted vs non-weighted KNN
+
+# In[66]:
+
+
+import random
+
+# We set the seed for consistency, also doing 5 folds
+n_folds = 5
+random.seed(42)
+
+# Prepare and shuffle the folds
+# We are not using the normalized dataset from earlier
+# as it could introduce bias (min/max leaks into different folds)
+dataset_combined = [list(X[i]) + [y[i]] for i in range(len(X))]
+random.shuffle(dataset_combined)
+
+fold_size = len(dataset_combined) // n_folds
+folds = []
+for i in range(n_folds):
+    if i == n_folds - 1:
+        folds.append(dataset_combined[i * fold_size:])
+    else:
+        folds.append(dataset_combined[i * fold_size : (i + 1) * fold_size])
+
+# Final average accuracy for every K
+n_fold_k_accuracies = []
+n_fold_k_accuracies_w = []
+
+# The K loop
+for k in range(1, 101):
+    fold_accuracies = []
+    fold_accuracies_w = []
+
+    # The N-fold loop
+    for i in range(n_folds):
+        test_fold = folds[i]
+
+        train_fold = []
+        for j in range(n_folds):
+            if i != j:
+                train_fold.extend(folds[j])
+
+        # Separate features and target feature
+        X_train_fold = [row[:-1] for row in train_fold]
+        y_train_fold = [row[-1] for row in train_fold]
+        X_test_fold = [row[:-1] for row in test_fold]
+        y_test_fold = [row[-1] for row in test_fold]
+
+        # Calculate min/max strictly on training fold !!!
+        mins = [min(column) for column in zip(*X_train_fold)]
+        maxs = [max(column) for column in zip(*X_train_fold)]
+        # Then we can normalize
+        X_train_norm = normalize_dataset(X_train_fold, mins, maxs)
+        X_test_norm = normalize_dataset(X_test_fold, mins, maxs)
+
+        # Finally we make weighted predictions using euclidean again
+        correct_w = 0
+        for idx in range(len(X_test_norm)):
+            prediction = predict_classification_weighted(X_train_norm, y_train_fold, X_test_norm[idx], k, euclidean)
+            if prediction == y_test_fold[idx]:
+                correct_w += 1
+
+        # Finally we make non-weighted predictions using euclidean again
+        correct_nw = 0
+        for idx in range(len(X_test_norm)):
+            prediction = predict_classification(X_train_norm, y_train_fold, X_test_norm[idx], k, euclidean)
+            if prediction == y_test_fold[idx]:
+                correct_nw += 1
+
+        # Save accuracy for this specific fold
+        fold_accuracies.append(correct_nw / len(X_test_fold))
+        fold_accuracies_w.append(correct_w / len(X_test_fold))
+
+    # Average the 5 folds for this specific K value
+    average_accuracy_for_k = sum(fold_accuracies) / n_folds
+    n_fold_k_accuracies.append(average_accuracy_for_k)
+    average_accuracy_for_k_w = sum(fold_accuracies_w) / n_folds
+    n_fold_k_accuracies_w.append(average_accuracy_for_k_w)
+    print(f"k = {k} | N-Fold Avg Accuracy (Non-Weighted): {average_accuracy_for_k:.2%} | N-Fold Avg Accuracy (Weighted): {average_accuracy_for_k_w:.2%}")
+
+
+# We need matplotlib to make a graph
+import matplotlib.pyplot as plt
+
+# Convert accuracy to error (error = 1 - accuracy)
+error_rate_n_fold = [(1 - acc) for acc in n_fold_k_accuracies]
+
+# Convert accuracy to error (error = 1 - accuracy)
+error_rate_n_fold_w = [(1 - acc) for acc in n_fold_k_accuracies_w]
+
+# K values we used above
+k_values = range(1, 101)
+
+# Set up the figure size
+plt.figure(figsize=(10, 6))
+
+# Plot the n-fold using the custom KNN
+plt.plot(k_values, error_rate_n_fold_w, color='blue', linestyle='dashed', 
+         marker='o', markerfacecolor='red', markersize=6, label='Custom Weighted KNN')
+
+# Compare to 80/20
+plt.plot(k_values, error_rate_n_fold, color='green', linestyle='dashed', 
+         marker='o', markerfacecolor='orange', markersize=6, label='Custom KNN')
+
+plt.title('Error Rate vs. K Value')
+plt.xlabel('K Value')
+plt.ylabel('Error Rate')
+plt.legend()
+plt.grid(True)
+
+plt.show()
+
+
+# ### Weighted KNN consistently performs better than non-weighted KNN
+# - Weighted KNN seems to hover at an error  rate around ~37%
+# - Non-weighted KNN is much more variable, but often has an error rate of above 40%
+# 
+# ### Best K value (n-fold = 5)
+# - Weighted KNN: 3 with accuracy of 64.71%
+# - Non-weighted KNN: 56 with accuracy of 64.07%
 
 # In[ ]:
 
