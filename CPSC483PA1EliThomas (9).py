@@ -689,6 +689,9 @@ plt.show()
 # ### Best K value (n-fold = 5)
 # - Weighted KNN: 3 with accuracy of 64.71%
 # - Non-weighted KNN: 56 with accuracy of 64.07%
+# 
+# ## Analysis:
+# #### Because Weighted KNN is inherently more resistant to dataset noise, it makes sense that the variability is much lower. This also explains why its best K-value is a lot lower at 3, as compared to non-weighted KNN, which had its best K-value at 56.
 
 # In[ ]:
 
